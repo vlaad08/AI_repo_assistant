@@ -4,7 +4,7 @@
 
 You can ask questions about locally cloned repos.
  ```
-   python app.py file -q "What can you tell me about this project"
+   python app.py -p file -q "What can you tell me about this project"
  ```
 
 It also allows the option to aks about public repos. It creates a temporary folder where it clones the repository. After it prints the response, it deletes the repo. 

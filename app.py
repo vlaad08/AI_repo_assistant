@@ -2,7 +2,9 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 from pathlib import Path
-from typing import Iterable
+import subprocess
+import tempfile
+import shutil
 import argparse
 
 load_dotenv()
@@ -71,20 +73,45 @@ def ask_openai(question: str, context: str) -> str:
     )
 
     return response.output_text
-    
+
+def clone_repo(url: str) -> Path:
+    temp_dir = Path(tempfile.mkdtemp(prefix="temp"))
+    try:
+        subprocess.run(
+            ["git", "clone", url, str(temp_dir)],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+    except subprocess.CalledProcessError as e:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise RuntimeError(f"cloning repository failed: {e.stderr}")
+    return temp_dir
+
 def main():
     parser = argparse.ArgumentParser(description="Repo Assistant")
-    parser.add_argument("path", type=str, help="Path to the repository")
+    parser.add_argument("--path", "-p", type=str, help="Path to the repository")
     parser.add_argument("--url", "-u", type=str, required=False, help="URL of the repository (optional)")
     parser.add_argument("--question", "-q", type=str, required=True, help="Question to ask about the repository")
     args = parser.parse_args()
-    root = Path(args.path).resolve()
-    print("Scanning:", root)
-    print("Exists:", root.exists())
-    context = build_context(root)
+    try:
+        if args.url:
+            tmpdir = clone_repo(args.url)
+            repo_root = tmpdir
+        else:
+            repo_root = Path(args.path).resolve()
+            if not repo_root.exists():
+                raise RuntimeError(f"Path does not exist: {repo_root}")
 
-    answer = ask_openai(args.question, context)
-    print(answer)
+        print("Scanning:", repo_root)
+
+        context = build_context(repo_root)
+        answer = ask_openai(args.question, context)
+        print(answer)
+
+    finally:
+        if tmpdir:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
 if __name__ == "__main__":
     main()
